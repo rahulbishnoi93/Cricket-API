@@ -157,7 +157,7 @@ def live_matches():
     live_matches = []
 
     for i in range(len(matches)):
-        live_matches.append(matches[i].text.strip())
+        live_matches.append({"liveMatchSummary": match.text.strip()})
     
     
     return jsonify(live_matches)
@@ -168,3 +168,4 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
