@@ -147,19 +147,43 @@ def schedule():
 
 @app.route('/live')
 def live_matches():
-    link = f"https://www.cricbuzz.com/cricket-match/live-scores"
+    link = "https://www.cricbuzz.com/cricket-match/live-scores"
     source = requests.get(link).text
     page = BeautifulSoup(source, "lxml")
 
-    page = page.find("div",class_="cb-col cb-col-100 cb-bg-white")
-    matches = page.find_all("div",class_="cb-scr-wll-chvrn cb-lv-scrs-col")
+    page = page.find("div", class_="cb-col cb-col-100 cb-bg-white")
+    matches = page.find_all("div", class_="cb-scr-wll-chvrn cb-lv-scrs-col")
 
     live_matches = []
 
-    for match in matches:
-        live_matches.append({"liveMatchSummary": match.text.strip()})
-    
-    
+    for m in matches:
+        raw_text = m.text.strip()
+
+        # Regex to find "TEAM score" parts
+        team_scores = re.findall(r"[A-Z]{2,4}\d+[-]?\d*\s*\([^)]*\)", raw_text)
+
+        formatted_parts = []
+        for ts in team_scores:
+            match = re.match(r"([A-Z]{2,4})(.*)", ts)
+            if match:
+                team = match.group(1)
+                score = match.group(2).strip()
+                formatted_parts.append(f"{team} \t {score}")
+
+        # Remaining status
+        status = raw_text
+        if team_scores:
+            last = team_scores[-1]
+            idx = raw_text.find(last) + len(last)
+            status = raw_text[idx:].strip()
+
+        if status:
+            formatted_parts.append(status)
+
+        formatted = "\n".join(formatted_parts)
+
+        live_matches.append({"liveMatchSummary": formatted})
+
     return jsonify(live_matches)
 
 @app.route('/')
@@ -168,5 +192,6 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
