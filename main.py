@@ -156,7 +156,7 @@ def live_matches():
 
     live_matches = []
 
-    for i in range(len(matches)):
+    for match in matches:
         live_matches.append({"liveMatchSummary": match.text.strip()})
     
     
@@ -168,4 +168,5 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
