@@ -157,32 +157,13 @@ def live_matches():
     live_matches = []
 
     for m in matches:
-        raw_text = m.text.strip()
+        teams = m.find_all("div", class_="cb-ovr-flo cb-hmscg-tm-nm")
 
-        # Regex to find "TEAM score" parts
-        team_scores = re.findall(r"[A-Z]{2,4}\d+[-]?\d*\s*\([^)]*\)", raw_text)
-
-        formatted_parts = []
-        for ts in team_scores:
-            match = re.match(r"([A-Z]{2,4})(.*)", ts)
-            if match:
-                team = match.group(1)
-                score = match.group(2).strip()
-                formatted_parts.append(f"{team} \t {score}")
-
-        # Remaining status
-        status = raw_text
-        if team_scores:
-            last = team_scores[-1]
-            idx = raw_text.find(last) + len(last)
-            status = raw_text[idx:].strip()
-
-        if status:
-            formatted_parts.append(status)
-
-        formatted = "\n".join(formatted_parts)
-
-        live_matches.append({"liveMatchSummary": formatted})
+        if len(teams) == 2:  # Always 2 teams
+            team1 = teams[0].get_text(strip=True)
+            team2 = teams[1].get_text(strip=True)
+            summary = f"{team1} vs {team2}"
+            live_matches.append({"liveMatchSummary": summary})
 
     return jsonify(live_matches)
 
@@ -192,6 +173,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
