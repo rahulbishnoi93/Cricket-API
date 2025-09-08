@@ -151,21 +151,33 @@ def live_matches():
     source = requests.get(link).text
     page = BeautifulSoup(source, "lxml")
 
+    # Container that holds all matches
     page = page.find("div", class_="cb-col cb-col-100 cb-bg-white")
-    matches = page.find_all("div", class_="cb-scr-wll-chvrn cb-lv-scrs-col")
+    matches = page.find_all("a", class_="cb-lv-scrs-well")  # anchor has match link + score
 
     live_matches = []
 
     for m in matches:
+        # extract matchId from href
+        href = m.get("href", "")
+        match_id = None
+        if href.startswith("/live-cricket-scores/"):
+            match_id = href.split("/")[2]  # second part is ID
+
+        # get team names
         teams = m.find_all("div", class_="cb-ovr-flo cb-hmscg-tm-nm")
 
-        if len(teams) == 2:  # Always 2 teams
+        if len(teams) == 2:
             team1 = teams[0].get_text(strip=True)
             team2 = teams[1].get_text(strip=True)
             summary = f"{team1} vs {team2}"
-            live_matches.append({"liveMatchSummary": summary})
+            live_matches.append({
+                "matchId": match_id,
+                "liveMatchSummary": summary
+            })
 
     return jsonify(live_matches)
+
 
 @app.route('/match/<match_id>')
 def match_details(match_id):
@@ -266,6 +278,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
