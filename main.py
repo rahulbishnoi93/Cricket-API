@@ -274,10 +274,11 @@ def match_details(match_id):
 
 @app.route('/')
 def website():
-    return render_template('index.html')
+    return "OK"
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
