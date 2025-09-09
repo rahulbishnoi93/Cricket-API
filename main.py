@@ -11,6 +11,35 @@ from flask import render_template
 
 app = Flask(__name__)
 
+# Allowed teams dictionary
+ALLOWED_TEAMS = {
+    # ICC Full Members
+    "IND": "India",
+    "PAK": "Pakistan",
+    "AUS": "Australia",
+    "ENG": "England",
+    "SA": "South Africa",
+    "NZ": "New Zealand",
+    "SL": "Sri Lanka",
+    "BAN": "Bangladesh",
+    "AFG": "Afghanistan",
+    "IRE": "Ireland",
+    "ZIM": "Zimbabwe",
+    "WI": "West Indies",
+
+    # Prominent ICC Associate Members
+    "NED": "Netherlands",
+    "NEP": "Nepal",
+    "UAE": "United Arab Emirates",
+    "NAM": "Namibia",
+    "HK": "Hong Kong",
+    "USA": "United States",
+    "CAN": "Canada",
+    "PNG": "Papua New Guinea",
+    "OMA": "Oman",
+    "NZA": "New Zealand A",
+    "RSAA": "South Africa A"
+}
 
 @app.route('/players/<player_name>', methods=['GET'])
 def get_player(player_name):
@@ -171,13 +200,15 @@ def live_matches():
         for row in team_rows:
             name = row.find("div", class_="cb-ovr-flo cb-hmscg-tm-nm")
             score = row.find_all("div", class_="cb-ovr-flo")[-1]  # last div is usually the score
+            team_name = name.get_text(strip=True).upper() if name else ""
+
             team_data.append({
-                "team": name.get_text(strip=True) if name else "",
+                "team": team_name,
                 "score": score.get_text(strip=True) if score else ""
             })
 
-        # Build JSON entry
-        if len(team_data) == 2:
+        # Only keep matches where both teams are in allowed list
+        if len(team_data) == 2 and team_data[0]['team'] in ALLOWED_TEAMS and team_data[1]['team'] in ALLOWED_TEAMS:
             summary = f"{team_data[0]['team']} vs {team_data[1]['team']}"
             live_matches.append({
                 "matchId": match_id,
@@ -288,6 +319,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
