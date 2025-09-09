@@ -153,7 +153,7 @@ def live_matches():
 
     # Container that holds all matches
     page = page.find("div", class_="cb-col cb-col-100 cb-bg-white")
-    matches = page.find_all("a", class_="cb-lv-scrs-well")  # anchor has match link + score
+    matches = page.find_all("a", class_="cb-lv-scrs-well")
 
     live_matches = []
 
@@ -164,16 +164,26 @@ def live_matches():
         if href.startswith("/live-cricket-scores/"):
             match_id = href.split("/")[2]  # second part is ID
 
-        # get team names
-        teams = m.find_all("div", class_="cb-ovr-flo cb-hmscg-tm-nm")
+        # Get team rows (batting + bowling team)
+        team_rows = m.find_all("div", class_=["cb-hmscg-bat-txt", "cb-hmscg-bwl-txt"])
 
-        if len(teams) == 2:
-            team1 = teams[0].get_text(strip=True)
-            team2 = teams[1].get_text(strip=True)
-            summary = f"{team1} vs {team2}"
+        team_data = []
+        for row in team_rows:
+            name = row.find("div", class_="cb-ovr-flo cb-hmscg-tm-nm")
+            score = row.find_all("div", class_="cb-ovr-flo")[-1]  # last div is usually the score
+            team_data.append({
+                "team": name.get_text(strip=True) if name else "",
+                "score": score.get_text(strip=True) if score else ""
+            })
+
+        # Build JSON entry
+        if len(team_data) == 2:
+            summary = f"{team_data[0]['team']} vs {team_data[1]['team']}"
             live_matches.append({
                 "matchId": match_id,
-                "liveMatchSummary": summary
+                "liveMatchSummary": summary,
+                "team1": team_data[0],
+                "team2": team_data[1]
             })
 
     return jsonify(live_matches)
@@ -278,6 +288,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
