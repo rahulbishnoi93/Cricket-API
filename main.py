@@ -173,7 +173,68 @@ def schedule():
     
     return jsonify(matches)
 
+@app.route('/recent')
+def recent_matches():
+    link = "https://www.cricbuzz.com/cricket-match/live-scores/recent-matches"
+    source = requests.get(link).text
+    soup = BeautifulSoup(source, "lxml")
 
+    recent_matches = []
+
+    # Each match block
+    match_blocks = soup.find_all("div", class_="cb-mtch-lst")
+
+    for block in match_blocks:
+        # Header: title, format, venue
+        header = block.find("h3", class_="cb-lv-scr-mtch-hdr")
+        header_link = header.find("a") if header else None
+
+        href = header_link.get("href", "") if header_link else ""
+        match_id = None
+        if href.startswith("/live-cricket-scores/"):
+            match_id = href.split("/")[2]
+
+        # Date and time
+        datetime_section = block.find("div", class_="text-gray")
+        match_date, match_time, venue = "", "", ""
+        if datetime_section:
+            parts = datetime_section.get_text(" ", strip=True).split("•")
+            if len(parts) >= 2:
+                match_date = parts[0].strip()
+            if "at" in datetime_section.text:
+                venue = datetime_section.text.split("at")[-1].strip()
+
+        # Teams + scores
+        team_rows = block.find_all("div", class_=["cb-hmscg-bat-txt", "cb-hmscg-bwl-txt"])
+        team_data = []
+        for row in team_rows:
+            name = row.find("div", class_="cb-ovr-flo cb-hmscg-tm-nm")
+            score = row.find_all("div", class_="cb-ovr-flo")[-1] if row.find_all("div", class_="cb-ovr-flo") else None
+            team_name = name.get_text(strip=True).upper() if name else ""
+            if team_name in ALLOWED_TEAMS:
+                team_data.append({
+                    "team": team_name,
+                    "score": score.get_text(strip=True) if score else ""
+                })
+
+        # Match result
+        result = block.find("div", class_="cb-text-complete")
+        result_text = result.get_text(strip=True) if result else ""
+
+        # Only keep if valid teams
+        if len(team_data) == 2 and team_data[0]['team'] in ALLOWED_TEAMS and team_data[1]['team'] in ALLOWED_TEAMS:
+            summary = f"{team_data[0]['team']} vs {team_data[1]['team']}"
+            recent_matches.append({
+                "matchId": match_id,
+                "date": match_date,
+                "matchSummary": summary,
+                "team1": team_data[0],
+                "team2": team_data[1],
+                "result": result_text
+            })
+
+    return jsonify(recent_matches)
+    
 @app.route('/live')
 def live_matches():
     link = "https://www.cricbuzz.com/cricket-match/live-scores"
@@ -319,6 +380,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
