@@ -153,25 +153,66 @@ def get_player(player_name):
 def schedule():
     link = f"https://www.cricbuzz.com/cricket-schedule/upcoming-series/international"
     source = requests.get(link).text
-    page = BeautifulSoup(source, "lxml")
+    soup = BeautifulSoup(source, "lxml")
 
-    # Find all match containers
-    match_containers = page.find_all("div", class_="cb-col-100 cb-col")
+    upcoming_matches = []
 
-    matches = []
+    # Each match container
+    match_containers = soup.find_all("div", itemscope=True, itemtype="http://schema.org/SportsEvent")
 
-    # Iterate through each match container
-    for container in match_containers:
-        # Extract match details
-        date = container.find("div", class_="cb-lv-grn-strip text-bold")
-        match_info = container.find("div", class_="cb-col-100 cb-col")
-        
-        if date and match_info:
-            match_date = date.text.strip()
-            match_details = match_info.text.strip()
-            matches.append(f"{match_date} - {match_details}")
-    
-    return jsonify(matches)
+    for match in match_containers:
+        # Match title
+        title_tag = match.find("a")
+        match_title = title_tag.get_text(strip=True) if title_tag else ""
+
+        # Extract teams and remaining details
+        team1, team2, details = "", "", ""
+        if "," in match_title:
+            teams_part, details = match_title.split(",", 1)
+            teams = teams_part.split(" vs ")
+            if len(teams) == 2:
+                # Convert to short codes if in allowed teams
+                team1_full = teams[0].strip()
+                team2_full = teams[1].strip()
+                team1_code = next((k for k, v in ALLOWED_TEAMS.items() if v == team1_full), "")
+                team2_code = next((k for k, v in ALLOWED_TEAMS.items() if v == team2_full), "")
+                if team1_code and team2_code:
+                    team1 = team1_code
+                    team2 = team2_code
+            details = details.strip()
+        else:
+            if " vs " in match_title:
+                teams = match_title.split(" vs ")
+                if len(teams) == 2:
+                    team1_full = teams[0].strip()
+                    team2_full = teams[1].strip()
+                    team1_code = next((k for k, v in ALLOWED_TEAMS.items() if v == team1_full), "")
+                    team2_code = next((k for k, v in ALLOWED_TEAMS.items() if v == team2_full), "")
+                    if team1_code and team2_code:
+                        team1 = team1_code
+                        team2 = team2_code
+
+        # Skip if teams not allowed
+        if not team1 or not team2:
+            continue
+
+        # Match date
+        date_span = match.find("span", itemprop="startDate")
+        match_date = date_span["content"].strip() if date_span and "content" in date_span.attrs else ""
+
+        # Match time
+        time_span = match.find("span", class_="schedule-date")
+        match_time = time_span.get_text(strip=True) if time_span else ""
+
+        upcoming_matches.append({
+            "team1": team1,
+            "team2": team2,
+            "details": details,
+            "date": match_date,
+            "time": match_time
+        })
+
+    return jsonify(upcoming_matches)
 
 @app.route('/recent')
 def recent_matches():
@@ -380,6 +421,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
