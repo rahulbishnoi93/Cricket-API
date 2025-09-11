@@ -37,8 +37,10 @@ ALLOWED_TEAMS = {
     "CAN": "Canada",
     "PNG": "Papua New Guinea",
     "OMA": "Oman",
-    "NZA": "New Zealand A",
-    "RSAA": "South Africa A"
+    
+    #temp teams
+    "DUR": "New Zealand A",
+    "ESS": "South Africa A"
 }
 
 @app.route('/players/<player_name>', methods=['GET'])
@@ -406,6 +408,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
