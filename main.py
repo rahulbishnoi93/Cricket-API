@@ -419,6 +419,8 @@ def match_details(match_id):
                         result["Livestatus"] = next_div.get_text(strip=True)
                         break
 
+        return jsonify(result)
+
     except Exception as e:
         # Catch any unexpected errors during the request or parsing
         return jsonify({"error": str(e)}), 500
@@ -429,6 +431,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
