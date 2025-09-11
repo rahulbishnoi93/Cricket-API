@@ -322,98 +322,83 @@ def live_matches():
     return jsonify(live_matches)
 
 
-@app.route('/match/<match_id>')
+@app.route("/match/<match_id>", methods=["GET"])
 def match_details(match_id):
-    link = f"https://www.cricbuzz.com/live-cricket-scores/{match_id}"
-    source = requests.get(link, headers={"User-Agent": "Mozilla/5.0"}).text
-    page = BeautifulSoup(source, "lxml")
+    try:
+        # Fetch the HTML content
+        URL = f"https://www.cricbuzz.com/live-cricket-scores/{match_id}"
+        response = requests.get(URL)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
 
-    result = {}
+        # Initialize a dictionary with all keys to ensure consistent JSON output
+        result = {
+            "status": None,
+            "player_of_the_match": None,
+            "batsmen": [],
+            "bowlers": []
+        }
 
-    # ---- Teams ----
-    batting_team = page.find("h2", class_="cb-font-20 text-bold inline-block")
-    # ---- Match title ----
-    title_tag = page.find("h1", class_="cb-nav-hdr")
-    if title_tag:
-        result["title"] = title_tag.get_text(strip=True)
-    
+        # Attempt to parse live match details
+        # We check for the presence of elements that are only in a live match page
+        batsmen_div = soup.find("div", class_="cb-min-inf", ng_if=lambda x: x and "batsman" in x)
+        if not batsmen_div:
+            batsmen_div = soup.find("div", class_="cb-min-inf cb-col-100")
 
-    # ---- Current score ----
-    if batting_team:
-        result["currentScore"] = batting_team.get_text(strip=True)
+        # Check if live match parsing is possible
+        if batsmen_div:
+            # Parse Batsmen
+            for row in batsmen_div.find_all("div", class_="cb-min-itm-rw"):
+                cols = row.find_all("div")
+                if len(cols) < 6:
+                    continue
+                batsman = {
+                    "name": cols[0].text.strip().replace("*",""),
+                    "runs": cols[1].text.strip(),
+                    "balls": cols[2].text.strip(),
+                    "fours": cols[3].text.strip(),
+                    "sixes": cols[4].text.strip(),
+                    "strike_rate": cols[5].text.strip()
+                }
+                result["batsmen"].append(batsman)
 
-    # ---- Current run rate ----
-    crr_tag = page.find("span", string=lambda t: t and "CRR:" in t)
-    if crr_tag and crr_tag.find_next("span"):
-        result["currentRunRate"] = crr_tag.find_next("span").get_text(strip=True)
+            # Parse Bowlers
+            bowlers_divs = soup.find_all("div", class_="cb-min-inf cb-col-100")
+            if len(bowlers_divs) > 1:
+                bowlers_div = bowlers_divs[1]
+                for row in bowlers_div.find_all("div", class_="cb-min-itm-rw"):
+                    cols = row.find_all("div")
+                    if len(cols) < 6:
+                        continue
+                    bowler = {
+                        "name": cols[0].text.strip().replace("*",""),
+                        "overs": cols[1].text.strip(),
+                        "maidens": cols[2].text.strip(),
+                        "runs": cols[3].text.strip(),
+                        "wickets": cols[4].text.strip(),
+                        "econ": cols[5].text.strip()
+                    }
+                    result["bowlers"].append(bowler)
+        else:
+            # If live match elements are not found, assume the match is complete
+            complete_div = soup.find("div", class_="cb-min-comp")
+            if complete_div:
+                # Find the match status
+                status_element = complete_div.find("div", class_="cb-min-stts")
+                result["status"] = status_element.text.strip() if status_element else "Status not found."
 
-    # ---- Match status ----
-    status_tag = page.find("div", class_="cb-text-stumps")
-    if status_tag:
-        result["status"] = status_tag.get_text(strip=True)
+                # Find the Player of the Match
+                mom_element = complete_div.find("div", class_="cb-mom-itm")
+                if mom_element:
+                    mom_link = mom_element.find("a", class_="cb-link-undrln")
+                    if mom_link:
+                        result["player_of_the_match"] = mom_link.text.strip()
 
-    # ---- Batters ----
-    batters = []
-    inf_blocks = page.select("div.cb-min-inf")
-    if len(inf_blocks) > 0:
-        batter_rows = inf_blocks[0].select("div.cb-min-itm-rw")[:2]
-        for row in batter_rows:
-            cols = row.find_all("div")
-            if len(cols) >= 6:
-                batters.append({
-                    "name": cols[0].get_text(" ", strip=True),
-                    "runs": cols[1].get_text(strip=True),
-                    "balls": cols[2].get_text(strip=True),
-                    "fours": cols[3].get_text(strip=True),
-                    "sixes": cols[4].get_text(strip=True),
-                    "strikeRate": cols[5].get_text(strip=True)
-                })
-    result["batters"] = batters
+        return jsonify(result)
 
-    # ---- Bowlers ----
-    bowlers = []
-    if len(inf_blocks) > 1:
-        bowler_rows = inf_blocks[1].select("div.cb-min-itm-rw")[:2]
-        for row in bowler_rows:
-            cols = row.find_all("div")
-            if len(cols) >= 6:
-                bowlers.append({
-                    "name": cols[0].get_text(" ", strip=True),
-                    "overs": cols[1].get_text(strip=True),
-                    "maidens": cols[2].get_text(strip=True),
-                    "runs": cols[3].get_text(strip=True),
-                    "wickets": cols[4].get_text(strip=True),
-                    "economy": cols[5].get_text(strip=True)
-                })
-    result["bowlers"] = bowlers
-
-    # ---- Key Stats ----
-    key_stats = {}
-    key_block = page.select_one("div.cb-col.cb-col-33.cb-key-st-lst")
-    if key_block:
-        for row in key_block.select("div.cb-min-itm-rw"):
-            label = row.find("span", class_="text-bold")
-            value = row.find_all("span")[-1]
-            if label and value:
-                text = label.get_text(strip=True)
-                if text.startswith("Partnership"):
-                    key_stats["partnership"] = value.get_text(strip=True)
-                elif text.startswith("Last Wkt"):
-                    key_stats["lastWicket"] = value.get_text(strip=True)
-                elif text.startswith("Ovs Left"):
-                    key_stats["oversLeft"] = value.get_text(strip=True)
-                elif text.startswith("Last 10 overs"):
-                    key_stats["last10Overs"] = value.get_text(strip=True)
-                elif text.startswith("Toss"):
-                    key_stats["toss"] = value.get_text(strip=True)
-    result["keyStats"] = key_stats
-
-    # ---- Recent balls ----
-    recent_tag = page.find("div", class_="cb-min-rcnt")
-    if recent_tag:
-        result["recent"] = recent_tag.get_text(strip=True).replace("Recent:", "").strip()
-
-    return jsonify(result)
+    except Exception as e:
+        # Catch any unexpected errors during the request or parsing
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/')
 def website():
@@ -421,6 +406,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
