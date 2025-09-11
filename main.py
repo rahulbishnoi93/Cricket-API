@@ -409,11 +409,15 @@ def match_details(match_id):
                 result["match_title"] = full_heading
 
         # Match status
-        status_tag = soup.select_one("div.cb-text-inprogress")
-        if status_tag:
-            result["Livestatus"] = status_tag.get_text(strip=True)
-
-        return jsonify(result)
+        bat_row = soup.select_one("div.cb-min-bat-rw")
+        if bat_row:
+            # Look for the next sibling <div> whose class starts with "cb-text-"
+            next_div = bat_row.find_next_sibling("div")
+            if next_div and next_div.get("class"):
+                for cls in next_div.get("class"):
+                    if cls.startswith("cb-text-"):
+                        result["Livestatus"] = next_div.get_text(strip=True)
+                        break
 
     except Exception as e:
         # Catch any unexpected errors during the request or parsing
@@ -425,6 +429,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
