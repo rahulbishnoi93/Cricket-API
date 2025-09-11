@@ -396,6 +396,23 @@ def match_details(match_id):
                     if mom_link:
                         result["player_of_the_match"] = mom_link.text.strip()
 
+        # Match Heading
+        heading_tag = soup.select_one("h1.cb-nav-hdr")
+        if heading_tag:
+            full_heading = heading_tag.get_text(strip=True)
+
+            # Split into title and extra part
+            if " - " in full_heading:
+                parts = full_heading.split(" - ", 1)
+                result["match_title"] = parts[0]
+            else:
+                result["match_title"] = full_heading
+
+        # Match status
+        status_tag = soup.select_one("div.cb-text-inprogress")
+        if status_tag:
+            result["Livestatus"] = status_tag.get_text(strip=True)
+
         return jsonify(result)
 
     except Exception as e:
@@ -408,6 +425,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
