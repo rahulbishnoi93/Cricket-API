@@ -37,12 +37,20 @@ ALLOWED_TEAMS = {
     "CAN": "Canada",
     "PNG": "Papua New Guinea",
     "OMA": "Oman",
-    
+
     #temp teams
     "DUR": "New Zealand A",
     "ESS": "South Africa A"
 }
 DISABLE_FILTER_ALLOWED_TEAMS = True
+
+# 🔒 Global no-cache headers
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.route('/players/<player_name>', methods=['GET'])
 def get_player(player_name):
@@ -55,18 +63,18 @@ def get_player(player_name):
                 profile_link = link
                 print(f"Found profile: {profile_link}")
                 break
-                
+
         if not profile_link:
             return {"error": "No player profile found"}
     except Exception as e:
         return {"error": f"Search failed: {str(e)}"}
-    
+
     # Get player profile page
     c = requests.get(profile_link).text
     cric = BeautifulSoup(c, "lxml")
     profile = cric.find("div", id="playerProfile")
     pc = profile.find("div", class_="cb-col cb-col-100 cb-bg-white")
-    
+
     # Name, country and image
     name = pc.find("h1", class_="cb-font-40").text
     country = pc.find("h3", class_="cb-font-18 text-gray").text
@@ -79,13 +87,13 @@ def get_player(player_name):
     # Personal information and rankings
     personal = cric.find_all("div", class_="cb-col cb-col-60 cb-lst-itm-sm")
     role = personal[2].text.strip()
-    
+
     icc = cric.find_all("div", class_="cb-col cb-col-25 cb-plyr-rank text-right")
     # Batting rankings
     tb = icc[0].text.strip()   # Test batting
     ob = icc[1].text.strip()   # ODI batting
     twb = icc[2].text.strip()  # T20 batting
-    
+
     # Bowling rankings
     tbw = icc[3].text.strip()  # Test bowling
     obw = icc[4].text.strip()  # ODI bowling
@@ -255,7 +263,7 @@ def recent_matches():
             name = row.find("div", class_="cb-ovr-flo cb-hmscg-tm-nm")
             score = row.find_all("div", class_="cb-ovr-flo")[-1] if row.find_all("div", class_="cb-ovr-flo") else None
             team_name = name.get_text(strip=True).upper() if name else ""
-            if team_name in ALLOWED_TEAMS:
+            if (team_name in ALLOWED_TEAMS) or DISABLE_FILTER_ALLOWED_TEAMS:
                 team_data.append({
                     "team": team_name,
                     "score": score.get_text(strip=True) if score else ""
@@ -266,7 +274,10 @@ def recent_matches():
         result_text = result.get_text(strip=True) if result else ""
 
         # Only keep if valid teams
-        if len(team_data) == 2 and team_data[0]['team'] in ALLOWED_TEAMS and team_data[1]['team'] in ALLOWED_TEAMS:
+        if len(team_data) == 2 and (
+            (team_data[0]['team'] in ALLOWED_TEAMS or team_data[1]['team'] in                     ALLOWED_TEAMS)
+            or DISABLE_FILTER_ALLOWED_TEAMS
+        ):
             summary = f"{team_data[0]['team']} vs {team_data[1]['team']}"
             recent_matches.append({
                 "matchId": match_id,
@@ -278,7 +289,7 @@ def recent_matches():
             })
 
     return jsonify(recent_matches)
-    
+
 @app.route('/live')
 def live_matches():
     link = "https://www.cricbuzz.com/cricket-match/live-scores"
@@ -313,8 +324,9 @@ def live_matches():
             })
 
         # Only keep matches where both teams are in allowed list
-        if (
-            (len(team_data) == 2 and team_data[0]['team'] in ALLOWED_TEAMS or team_data[1]['team'] in ALLOWED_TEAMS)
+            # Only keep if valid teams
+        if len(team_data) == 2 and (
+            (team_data[0]['team'] in ALLOWED_TEAMS or team_data[1]['team'] in                     ALLOWED_TEAMS)
             or DISABLE_FILTER_ALLOWED_TEAMS
         ):
             summary = f"{team_data[0]['team']} vs {team_data[1]['team']}"
@@ -435,6 +447,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
