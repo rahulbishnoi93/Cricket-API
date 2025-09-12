@@ -42,7 +42,7 @@ ALLOWED_TEAMS = {
     "DUR": "New Zealand A",
     "ESS": "South Africa A"
 }
-DISABLE_FILTER_ALLOWED_TEAMS = False
+DISABLE_FILTER_ALLOWED_TEAMS = True
 
 @app.route('/players/<player_name>', methods=['GET'])
 def get_player(player_name):
@@ -435,6 +435,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
