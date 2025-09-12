@@ -42,6 +42,7 @@ ALLOWED_TEAMS = {
     "DUR": "New Zealand A",
     "ESS": "South Africa A"
 }
+DISABLE_FILTER_ALLOWED_TEAMS = False
 
 @app.route('/players/<player_name>', methods=['GET'])
 def get_player(player_name):
@@ -312,7 +313,10 @@ def live_matches():
             })
 
         # Only keep matches where both teams are in allowed list
-        if len(team_data) == 2 and team_data[0]['team'] in ALLOWED_TEAMS and team_data[1]['team'] in ALLOWED_TEAMS:
+        if (
+            (len(team_data) == 2 and team_data[0]['team'] in ALLOWED_TEAMS or team_data[1]['team'] in ALLOWED_TEAMS)
+            or DISABLE_FILTER_ALLOWED_TEAMS
+        ):
             summary = f"{team_data[0]['team']} vs {team_data[1]['team']}"
             live_matches.append({
                 "matchId": match_id,
@@ -431,6 +435,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
