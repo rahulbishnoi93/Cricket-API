@@ -43,7 +43,7 @@ ALLOWED_TEAMS = {
     "DUR": "New Zealand A",
     "ESS": "South Africa A"
 }
-DISABLE_FILTER_ALLOWED_TEAMS = True
+DISABLE_FILTER_ALLOWED_TEAMS = False
 
 # 🔒 Global cache headers
 def with_cache(data, cache_control):
@@ -448,6 +448,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
