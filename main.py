@@ -8,6 +8,7 @@ from flask import Response
 import json
 from googlesearch import search #pip install googlesearch-python
 from flask import render_template
+from flask import make_response
 
 app = Flask(__name__)
 
@@ -44,12 +45,10 @@ ALLOWED_TEAMS = {
 }
 DISABLE_FILTER_ALLOWED_TEAMS = True
 
-# 🔒 Global no-cache headers
-@app.after_request
-def add_no_cache_headers(response):
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
+# 🔒 Global cache headers
+def with_cache(data, cache_control):
+    response = make_response(jsonify(data))
+    response.headers["Cache-Control"] = cache_control
     return response
 
 @app.route('/players/<player_name>', methods=['GET'])
@@ -223,7 +222,8 @@ def schedule():
             "time": match_time
         })
 
-    return jsonify(upcoming_matches)
+    # Schedule → long cache (e.g. 6 hours)
+    return with_cache(upcoming_matches, "public, max-age=21600")  # 6 * 3600
 
 @app.route('/recent')
 def recent_matches():
@@ -288,7 +288,8 @@ def recent_matches():
                 "result": result_text
             })
 
-    return jsonify(recent_matches)
+    # Recent → medium cache (e.g. 120 seconds)
+    return with_cache(recent_matches, "public, max-age=120")
 
 @app.route('/live')
 def live_matches():
@@ -337,7 +338,7 @@ def live_matches():
                 "team2": team_data[1]
             })
 
-    return jsonify(live_matches)
+    return with_cache(live_matches, "no-store, no-cache, must-revalidate, max-age=0")
 
 
 @app.route("/match/<match_id>", methods=["GET"])
@@ -435,7 +436,7 @@ def match_details(match_id):
                         result["Livestatus"] = next_div.get_text(strip=True)
                         break
 
-        return jsonify(result)
+        return with_cache(result, "no-store, no-cache, must-revalidate, max-age=0")
 
     except Exception as e:
         # Catch any unexpected errors during the request or parsing
@@ -447,6 +448,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
