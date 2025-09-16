@@ -51,112 +51,185 @@ def with_cache(data, cache_control):
     response.headers["Cache-Control"] = cache_control
     return response
 
-@app.route('/players/<player_name>', methods=['GET'])
-def get_player(player_name):
-    query = f"{player_name} cricbuzz"
-    profile_link = None
-    try:
-        results = search(query, num_results=5)
-        for link in results:
-            if "cricbuzz.com/profiles/" in link:
-                profile_link = link
-                print(f"Found profile: {profile_link}")
-                break
+@app.route('/allMatches')
+def all_matches():
+    link_schedule = f"https://www.cricbuzz.com/cricket-schedule/upcoming-series/international"
+    source = requests.get(link_schedule).text
+    soup = BeautifulSoup(source, "lxml")
 
-        if not profile_link:
-            return {"error": "No player profile found"}
-    except Exception as e:
-        return {"error": f"Search failed: {str(e)}"}
+    upcoming_matches = []
 
-    # Get player profile page
-    c = requests.get(profile_link).text
-    cric = BeautifulSoup(c, "lxml")
-    profile = cric.find("div", id="playerProfile")
-    pc = profile.find("div", class_="cb-col cb-col-100 cb-bg-white")
+    # Each match container
+    match_containers = soup.find_all("div", itemscope=True, itemtype="http://schema.org/SportsEvent")
 
-    # Name, country and image
-    name = pc.find("h1", class_="cb-font-40").text
-    country = pc.find("h3", class_="cb-font-18 text-gray").text
-    image_url = None
-    images = pc.findAll('img')
-    for image in images:
-        image_url = image['src']
-        break  # Just get the first image
+    for match in match_containers:
+        # Match title
+        title_tag = match.find("a")
+        match_title = title_tag.get_text(strip=True) if title_tag else ""
 
-    # Personal information and rankings
-    personal = cric.find_all("div", class_="cb-col cb-col-60 cb-lst-itm-sm")
-    role = personal[2].text.strip()
+        # Extract teams and remaining details
+        team1, team2, details = "", "", ""
+        if "," in match_title:
+            teams_part, details = match_title.split(",", 1)
+            teams = teams_part.split(" vs ")
+            if len(teams) == 2:
+                # Convert to short codes if in allowed teams
+                team1_full = teams[0].strip()
+                team2_full = teams[1].strip()
+                team1_code = next((k for k, v in ALLOWED_TEAMS.items() if v == team1_full), "")
+                team2_code = next((k for k, v in ALLOWED_TEAMS.items() if v == team2_full), "")
+                if team1_code and team2_code:
+                    team1 = team1_code
+                    team2 = team2_code
+            details = details.strip()
+        else:
+            if " vs " in match_title:
+                teams = match_title.split(" vs ")
+                if len(teams) == 2:
+                    team1_full = teams[0].strip()
+                    team2_full = teams[1].strip()
+                    team1_code = next((k for k, v in ALLOWED_TEAMS.items() if v == team1_full), "")
+                    team2_code = next((k for k, v in ALLOWED_TEAMS.items() if v == team2_full), "")
+                    if team1_code and team2_code:
+                        team1 = team1_code
+                        team2 = team2_code
 
-    icc = cric.find_all("div", class_="cb-col cb-col-25 cb-plyr-rank text-right")
-    # Batting rankings
-    tb = icc[0].text.strip()   # Test batting
-    ob = icc[1].text.strip()   # ODI batting
-    twb = icc[2].text.strip()  # T20 batting
+        # Skip if teams not allowed
+        if not team1 or not team2:
+            continue
 
-    # Bowling rankings
-    tbw = icc[3].text.strip()  # Test bowling
-    obw = icc[4].text.strip()  # ODI bowling
-    twbw = icc[5].text.strip() # T20 bowling
+        # Match date
+        date_span = match.find("span", itemprop="startDate")
+        match_date = date_span["content"].strip() if date_span and "content" in date_span.attrs else ""
 
-    # Summary of the stats
-    summary = cric.find_all("div", class_="cb-plyr-tbl")
-    batting = summary[0]
-    bowling = summary[1]
+        # Match time
+        time_span = match.find("span", class_="schedule-date")
+        match_time = time_span.get_text(strip=True) if time_span else ""
 
-    # Batting statistics
-    bat_rows = batting.find("tbody").find_all("tr")
-    batting_stats = {}
-    for row in bat_rows:
-        cols = row.find_all("td")
-        format_name = cols[0].text.strip().lower()  # e.g., "Test", "ODI", "T20"
-        batting_stats[format_name] = {
-            "matches": cols[1].text.strip(),
-            "runs": cols[3].text.strip(),
-            "highest_score": cols[5].text.strip(),
-            "average": cols[6].text.strip(),
-            "strike_rate": cols[7].text.strip(),
-            "hundreds": cols[12].text.strip(),
-            "fifties": cols[11].text.strip(),
-        }
+        upcoming_matches.append({
+            "team1": team1,
+            "team2": team2,
+            "details": details,
+            "date": match_date,
+            "time": match_time
+        })
 
-    # Bowling statistics
-    bowl_rows = bowling.find("tbody").find_all("tr")
-    bowling_stats = {}
-    for row in bowl_rows:
-        cols = row.find_all("td")
-        format_name = cols[0].text.strip().lower()  # e.g., "Test", "ODI", "T20"
-        bowling_stats[format_name] = {
-            "balls": cols[3].text.strip(),
-            "runs": cols[4].text.strip(),
-            "wickets": cols[5].text.strip(),
-            "best_bowling_innings": cols[9].text.strip(),
-            "economy": cols[7].text.strip(),
-            "five_wickets": cols[11].text.strip(),
-        }
+    # Schedule → long cache (e.g. 6 hours)
+    #return with_cache(upcoming_matches, "public, max-age=21600")  # 6 * 3600
+    link_live = "https://www.cricbuzz.com/cricket-match/live-scores"
+    source = requests.get(link_live).text
+    page = BeautifulSoup(source, "lxml")
 
-    # Create player stats dictionary
-    player_data = {
-        "name": name,
-        "country": country,
-        "image": image_url,
-        "role": role,
-        "rankings": {
-            "batting": {
-                "test": tb,
-                "odi": ob,
-                "t20": twb
-            },
-            "bowling": {
-                "test": tbw,
-                "odi": obw,
-                "t20": twbw
-            }
-        },
-        "batting_stats": batting_stats,
-        "bowling_stats": bowling_stats
-    }
+    # Container that holds all matches
+    page = page.find("div", class_="cb-col cb-col-100 cb-bg-white")
+    matches = page.find_all("a", class_="cb-lv-scrs-well")
 
-    return jsonify(player_data)
+    live_matches = []
+
+    for m in matches:
+        # extract matchId from href
+        href = m.get("href", "")
+        match_id = None
+        if href.startswith("/live-cricket-scores/"):
+            match_id = href.split("/")[2]  # second part is ID
+
+        # Get team rows (batting + bowling team)
+        team_rows = m.find_all("div", class_=["cb-hmscg-bat-txt", "cb-hmscg-bwl-txt"])
+
+        team_data = []
+        for row in team_rows:
+            name = row.find("div", class_="cb-ovr-flo cb-hmscg-tm-nm")
+            score = row.find_all("div", class_="cb-ovr-flo")[-1]  # last div is usually the score
+            team_name = name.get_text(strip=True).upper() if name else ""
+
+            team_data.append({
+                "team": team_name,
+                "score": score.get_text(strip=True) if score else ""
+            })
+
+        # Only keep matches where both teams are in allowed list
+            # Only keep if valid teams
+        if len(team_data) == 2 and (
+            (team_data[0]['team'] in ALLOWED_TEAMS or team_data[1]['team'] in                     ALLOWED_TEAMS)
+            or DISABLE_FILTER_ALLOWED_TEAMS
+        ):
+            summary = f"{team_data[0]['team']} vs {team_data[1]['team']}"
+            live_matches.append({
+                "matchId": match_id,
+                "liveMatchSummary": summary,
+                "team1": team_data[0],
+                "team2": team_data[1]
+            })
+
+    link_recent = "https://www.cricbuzz.com/cricket-match/live-scores/recent-matches"
+    source = requests.get(link_recent).text
+    soup = BeautifulSoup(source, "lxml")
+
+    recent_matches = []
+
+    # Each match block
+    match_blocks = soup.find_all("div", class_="cb-mtch-lst")
+
+    for block in match_blocks:
+        # Header: title, format, venue
+        header = block.find("h3", class_="cb-lv-scr-mtch-hdr")
+        header_link = header.find("a") if header else None
+
+        href = header_link.get("href", "") if header_link else ""
+        match_id = None
+        if href.startswith("/live-cricket-scores/"):
+            match_id = href.split("/")[2]
+
+        # Date and time
+        datetime_section = block.find("div", class_="text-gray")
+        match_date, match_time, venue = "", "", ""
+        if datetime_section:
+            parts = datetime_section.get_text(" ", strip=True).split("•")
+            if len(parts) >= 2:
+                match_date = parts[0].strip()
+            if "at" in datetime_section.text:
+                venue = datetime_section.text.split("at")[-1].strip()
+
+        # Teams + scores
+        team_rows = block.find_all("div", class_=["cb-hmscg-bat-txt", "cb-hmscg-bwl-txt"])
+        team_data = []
+        for row in team_rows:
+            name = row.find("div", class_="cb-ovr-flo cb-hmscg-tm-nm")
+            score = row.find_all("div", class_="cb-ovr-flo")[-1] if row.find_all("div", class_="cb-ovr-flo") else None
+            team_name = name.get_text(strip=True).upper() if name else ""
+            if (team_name in ALLOWED_TEAMS) or DISABLE_FILTER_ALLOWED_TEAMS:
+                team_data.append({
+                    "team": team_name,
+                    "score": score.get_text(strip=True) if score else ""
+                })
+
+        # Match result
+        result = block.find("div", class_="cb-text-complete")
+        result_text = result.get_text(strip=True) if result else ""
+
+        # Only keep if valid teams
+        if len(team_data) == 2 and (
+            (team_data[0]['team'] in ALLOWED_TEAMS or team_data[1]['team'] in                     ALLOWED_TEAMS)
+            or DISABLE_FILTER_ALLOWED_TEAMS
+        ):
+            summary = f"{team_data[0]['team']} vs {team_data[1]['team']}"
+            recent_matches.append({
+                "matchId": match_id,
+                "date": match_date,
+                "matchSummary": summary,
+                "team1": team_data[0],
+                "team2": team_data[1],
+                "result": result_text
+            })
+
+    all_output = []
+    all_output.append({
+        "upcoming_matches": upcoming_matches,
+        "live_matches": live_matches,
+        "recent_matches": recent_matches
+    })
+
+    return with_cache(all_output, "no-store, no-cache, must-revalidate, max-age=0")
 
 
 @app.route('/schedule')
@@ -448,6 +521,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
