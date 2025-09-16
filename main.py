@@ -222,8 +222,7 @@ def all_matches():
                 "result": result_text
             })
 
-    all_output = []
-    all_output.append({
+    all_output = ({
         "upcoming_matches": upcoming_matches,
         "live_matches": live_matches,
         "recent_matches": recent_matches
@@ -521,6 +520,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
