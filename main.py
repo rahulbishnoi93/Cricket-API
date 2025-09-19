@@ -40,8 +40,7 @@ ALLOWED_TEAMS = {
     "OMA": "Oman",
 
     #temp teams
-    "DUR": "New Zealand A",
-    "ESS": "South Africa A"
+
 }
 DISABLE_FILTER_ALLOWED_TEAMS = False
 
@@ -159,6 +158,18 @@ def all_matches():
                 "liveMatchSummary": summary,
                 "team1": team_data[0],
                 "team2": team_data[1]
+            })
+    live_matches.append(    {
+              "liveMatchSummary": "IND vs PAK",
+              "matchId": "115553",
+              "team1": {
+                "score": "127-9",
+                "team": "PAK"
+              },
+              "team2": {
+                "score": "120-3",
+                "team": "IND"
+              }
             })
 
     link_recent = "https://www.cricbuzz.com/cricket-match/live-scores/recent-matches"
@@ -520,6 +531,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
