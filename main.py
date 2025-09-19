@@ -440,7 +440,41 @@ def match_details(match_id):
             "batsmen": [],
             "bowlers": []
         }
-
+        result= {
+        "Livestatus": "Innings Break",
+          "batsmen": [
+            {
+              "balls": "16",
+              "fours": "0",
+              "name": "Shaheen Afridi",
+              "runs": "33",
+              "sixes": "4",
+              "strike_rate": "206.25"
+            }
+          ],
+          "bowlers": [
+            {
+              "econ": "11.30",
+              "maidens": "0",
+              "name": "Hardik Pandya",
+              "overs": "3",
+              "runs": "34",
+              "wickets": "1"
+            },
+            {
+              "econ": "7",
+              "maidens": "0",
+              "name": "Bumrah",
+              "overs": "4",
+              "runs": "28",
+              "wickets": "2"
+            }
+          ],
+          "match_title": "India vs Pakistan, 6th Match, Group A",
+          "player_of_the_match": "",
+          "status": ""
+        }
+        return with_cache(result, "no-store, no-cache, must-revalidate, max-age=0")
         # Attempt to parse live match details
         # We check for the presence of elements that are only in a live match page
         batsmen_div = soup.find("div", class_="cb-min-inf", ng_if=lambda x: x and "batsman" in x)
@@ -531,6 +565,7 @@ def website():
 
 if __name__ =="__main__":
     app.run(debug=True)
+
 
 
 
